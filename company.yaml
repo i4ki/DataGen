@@ -1,0 +1,13 @@
+format: csv
+filename: company.csv
+fields:
+  - cd_cnpj:
+      type: "string"
+      min: 14
+      max: 14
+      chars: "0-9"
+  - nm_razao_social:
+      type: "string"
+      min: 3
+      max: 256
+      chars: "A-Za-z "
