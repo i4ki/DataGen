@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/NeowayLabs/clinit-cfn-tool/utils"
-	"github.com/NeowayLabs/datagen/data"
 	"github.com/jteeuwen/go-pkg-optarg"
+	"github.com/tiago4orion/datagen/data"
 )
 
 func main() {
