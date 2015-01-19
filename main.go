@@ -57,6 +57,6 @@ func main() {
 		fmt.Println("Format: ", format)
 	}
 
-	err := data.Generator(dataConfigPath, outputFile, format)
+	err := data.Generator(dataConfigPath, outputFile, format, 100)
 	utils.Check(err)
 }

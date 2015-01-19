@@ -1,0 +1,20 @@
+
+
+         +-------------+          +-------------------+
+         |  DataConfig |          | Number of Records |
+         +-------------+          +-------------------+
+                |                          /
+                 \                        /
+                  \----------------------/
+                            |
+                  +-------------------+
+                  |     PushRecord    |  for i := 0; i < nRecords; i++ { recordChan <- record }
+                  +-------------------+
+                            |
+                  +-------------------+
+                  |   RecordConsumer  | x4   record <- recordChan; ---> outputChan <- generatedLine
+                  +-------------------+
+                            |
+                  +--------------------
+                  |  OutputProcessor  | x4   outputLine <- outputChan
+                  +-------------------+
