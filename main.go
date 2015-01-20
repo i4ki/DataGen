@@ -3,20 +3,23 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/NeowayLabs/clinit-cfn-tool/utils"
 	"github.com/jteeuwen/go-pkg-optarg"
-	"github.com/tiago4orion/datagen/data"
+	"github.com/tiago4orion/DataGen/data"
 )
 
 func main() {
 	var dataConfigPath, outputFile, format string
 	var helpOpt, missingOpts bool
+	var nrecords int32
 
 	optarg.Add("h", "help", "Displays this help", false)
 	optarg.Add("c", "data-config", "Data configuration file", "")
 	optarg.Add("o", "output-file", "Output file", "")
 	optarg.Add("f", "format", "Output format", "")
+	optarg.Add("n", "number-records", "Number of records", "")
 
 	for opt := range optarg.Parse() {
 		switch opt.ShortName {
@@ -26,6 +29,13 @@ func main() {
 			outputFile = opt.String()
 		case "f":
 			format = opt.String()
+		case "n":
+			ntmp, err := strconv.Atoi(opt.String())
+			if err != nil {
+				fmt.Println("Invalid -n value: ", opt.String())
+			} else {
+				nrecords = int32(ntmp)
+			}
 		case "h":
 			helpOpt = opt.Bool()
 
@@ -46,17 +56,16 @@ func main() {
 		missingOpts = true
 	}
 
+	if nrecords == 0 {
+		fmt.Println("-n is required...")
+		missingOpts = true
+	}
+
 	if missingOpts {
 		optarg.Usage()
 		os.Exit(1)
 	}
 
-	if os.Getenv("DEBUG_OPTS") != "" {
-		fmt.Println("Data config: ", dataConfigPath)
-		fmt.Println("Output file: ", outputFile)
-		fmt.Println("Format: ", format)
-	}
-
-	err := data.Generator(dataConfigPath, outputFile, format, 100)
+	err := data.Generator(dataConfigPath, outputFile, format, nrecords)
 	utils.Check(err)
 }

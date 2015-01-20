@@ -3,7 +3,7 @@ package data
 import (
 	"errors"
 	"fmt"
-	"math/rand"
+	"math"
 	"os"
 	"runtime"
 	"strconv"
@@ -35,8 +35,12 @@ func CSVLineCreate(record []RecordConfig) string {
 
 func feedWorkers(recordChan chan []RecordConfig, dataConfig DataConfig) {
 	var i int32
+
+	fmt.Println("Feeding data to process!")
 	for i = 0; i < dataConfig.Length; i++ {
+		fmt.Println("feeding data: ", i)
 		recordChan <- dataConfig.Records
+		time.Sleep(time.Millisecond)
 	}
 
 	close(recordChan)
@@ -44,19 +48,25 @@ func feedWorkers(recordChan chan []RecordConfig, dataConfig DataConfig) {
 	fmt.Println("All records scheduled to be created. Waiting workers...")
 }
 
-func pushRecords(workerIdx int, recordChan chan []RecordConfig, outputChan chan string, wg *sync.WaitGroup) {
-	defer wg.Done()
+func pushRecords(workerIdx int, nrecords int32, config *DataConfig, outputChan chan string, wg *sync.WaitGroup) chan float64 {
+	totalChan := make(chan float64, 100)
 
-	for record := range recordChan {
-		outLine := CSVLineCreate(record)
-		outputChan <- outLine
-		time.Sleep(time.Duration(rand.Intn(1e3)) * time.Millisecond)
-	}
+	go func() {
+		wg.Add(1)
+		for i := int32(0); i < nrecords; i++ {
+			outLine := CSVLineCreate(config.Records)
+			outputChan <- outLine
+			totalChan <- 100.0 * float64(i+1) / float64(nrecords)
+			time.Sleep(time.Millisecond)
+		}
 
-	fmt.Printf("Worker %d finished executing.\n", workerIdx)
+		defer wg.Done()
+	}()
+
+	return totalChan
 }
 
-func outputData(workerIdx int, outputChan chan string, config DataConfig, fileOut *os.File, wg *sync.WaitGroup) {
+func outputData(workerIdx int, outputChan chan string, config *DataConfig, fileOut *os.File, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for outStr := range outputChan {
@@ -64,26 +74,28 @@ func outputData(workerIdx int, outputChan chan string, config DataConfig, fileOu
 			panic(err)
 		}
 
-		time.Sleep(time.Duration(rand.Intn(1e3)) * time.Millisecond)
+		time.Sleep(time.Millisecond)
 	}
-
-	fmt.Printf("Output worker %d finished execution.\n", workerIdx)
 }
 
-func GenerateCsv(config DataConfig) error {
+func GenerateCsv(config *DataConfig) error {
 	var wgRecords, wgOutput sync.WaitGroup
-	recordChan := make(chan []RecordConfig)
 	outputChan := make(chan string)
 
 	ncpu := runtime.NumCPU()
 	runtime.GOMAXPROCS(ncpu)
 
-	go feedWorkers(recordChan, config)
+	recordsPerCore := config.Length / int32(ncpu)
 
 	files := make([]*os.File, ncpu)
+	totalPWorkers := make([]chan float64, ncpu)
 	for i := 0; i < ncpu; i++ {
-		wgRecords.Add(1)
-		go pushRecords(i, recordChan, outputChan, &wgRecords)
+		if i == (ncpu - 1) {
+			recordsPerCore += int32(math.Remainder(float64(config.Length), float64(ncpu)))
+		}
+
+		fmt.Println("Scheduling create of ", recordsPerCore)
+		totalPWorkers[i] = pushRecords(i, recordsPerCore, config, outputChan, &wgRecords)
 
 		file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(i) + ".csv")
 		files[i] = file
@@ -92,7 +104,18 @@ func GenerateCsv(config DataConfig) error {
 		go outputData(i, outputChan, config, files[i], &wgOutput)
 	}
 
-	wgRecords.Wait()
+	var wt1, wt2, wt3, wt4 float64
+
+	for !(wt1 == 100 && wt2 == 100 && wt3 == 100 && wt4 == 100) {
+		fmt.Printf("Workers status: %f%%, %f%%, %f%%, %f%%\r", wt1, wt2, wt3, wt4)
+		select {
+		case wt1 = <-totalPWorkers[0]:
+		case wt2 = <-totalPWorkers[1]:
+		case wt3 = <-totalPWorkers[2]:
+		case wt4 = <-totalPWorkers[3]:
+		}
+	}
+
 	close(outputChan)
 	wgOutput.Wait()
 
@@ -153,7 +176,7 @@ func Generator(configFile string, outputFile string, format string, length int32
 
 	switch format {
 	case "csv":
-		err = GenerateCsv(dataConfig)
+		err = GenerateCsv(&dataConfig)
 	default:
 		fmt.Println("Unknown format: " + format)
 	}
