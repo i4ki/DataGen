@@ -33,21 +33,6 @@ func CSVLineCreate(record []RecordConfig) string {
 	return "bleh; blih; bloh; bluh\n"
 }
 
-func feedWorkers(recordChan chan []RecordConfig, dataConfig DataConfig) {
-	var i int32
-
-	fmt.Println("Feeding data to process!")
-	for i = 0; i < dataConfig.Length; i++ {
-		fmt.Println("feeding data: ", i)
-		recordChan <- dataConfig.Records
-		time.Sleep(time.Millisecond)
-	}
-
-	close(recordChan)
-
-	fmt.Println("All records scheduled to be created. Waiting workers...")
-}
-
 func pushRecords(workerIdx int, nrecords int32, config *DataConfig, outputChan chan string, wg *sync.WaitGroup) chan float64 {
 	totalChan := make(chan float64, 100)
 
@@ -57,6 +42,7 @@ func pushRecords(workerIdx int, nrecords int32, config *DataConfig, outputChan c
 			outLine := CSVLineCreate(config.Records)
 			outputChan <- outLine
 			totalChan <- 100.0 * float64(i+1) / float64(nrecords)
+
 			time.Sleep(time.Millisecond)
 		}
 
@@ -107,7 +93,7 @@ func GenerateCsv(config *DataConfig) error {
 	var wt1, wt2, wt3, wt4 float64
 
 	for !(wt1 == 100 && wt2 == 100 && wt3 == 100 && wt4 == 100) {
-		fmt.Printf("Workers status: %f%%, %f%%, %f%%, %f%%\r", wt1, wt2, wt3, wt4)
+		fmt.Printf("Workers status: %.02f%%, %.02f%%, %.02f%%, %.02f%%                               \r", wt1, wt2, wt3, wt4)
 		select {
 		case wt1 = <-totalPWorkers[0]:
 		case wt2 = <-totalPWorkers[1]:
@@ -115,6 +101,8 @@ func GenerateCsv(config *DataConfig) error {
 		case wt4 = <-totalPWorkers[3]:
 		}
 	}
+
+	fmt.Printf("Workers status: %.02f%%, %.02f%%, %.02f%%, %.02f%%                               \r", wt1, wt2, wt3, wt4)
 
 	close(outputChan)
 	wgOutput.Wait()
