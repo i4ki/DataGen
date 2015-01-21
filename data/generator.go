@@ -7,13 +7,13 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/NeowayLabs/clinit-cfn-tool/utils"
+	utilsg "github.com/tiago4orion/DataGen/utils"
 )
-
-var CONCURRENT_ROUTINES int = 3
 
 type RecordConfig struct {
 	Name  string
@@ -29,27 +29,60 @@ type DataConfig struct {
 	OutputFile string
 }
 
-func CSVLineCreate(record []RecordConfig) string {
-	return "bleh; blih; bloh; bluh\n"
+type WorkerStatus struct {
+	Id    int
+	Total float64
 }
 
-func pushRecords(workerIdx int, nrecords int32, config *DataConfig, outputChan chan string, wg *sync.WaitGroup) chan float64 {
-	totalChan := make(chan float64, 100)
+func isWorkersComplete(workStats []float64) bool {
+	var complete bool = true
 
-	go func() {
-		wg.Add(1)
-		for i := int32(0); i < nrecords; i++ {
-			outLine := CSVLineCreate(config.Records)
-			outputChan <- outLine
-			totalChan <- 100.0 * float64(i+1) / float64(nrecords)
+	for i := 0; i < len(workStats); i++ {
+		complete = complete && (workStats[i] == 100)
+	}
 
-			time.Sleep(time.Millisecond)
+	return complete
+}
+
+func CSVLineCreate(record []RecordConfig) string {
+	fields := make([]string, len(record))
+	var err error
+
+	for idx, recordField := range record {
+		switch recordField.Type {
+		case "string":
+			fields[idx], err = utilsg.GeneratorString(recordField.Chars,
+				recordField.Min, recordField.Max)
+			if err != nil {
+				panic(err)
+			}
+		case "integer":
+			tmpInt, err := utilsg.GeneratorInteger(recordField.Min, recordField.Max)
+			if err != nil {
+				panic(err)
+			}
+
+			fields[idx] = strconv.Itoa(tmpInt)
+		}
+	}
+
+	return strings.Join(fields, ",") + "\n"
+}
+
+func pushRecords(workerIdx int, nrecords int32, config *DataConfig, outputChan chan string, workStatChan chan WorkerStatus, wg *sync.WaitGroup) {
+	wg.Add(1)
+	for i := int32(0); i < nrecords; i++ {
+		outLine := CSVLineCreate(config.Records)
+		outputChan <- outLine
+		workStatChan <- WorkerStatus{
+			Id:    workerIdx,
+			Total: 100.0 * float64(i+1) / float64(nrecords),
 		}
 
-		defer wg.Done()
-	}()
+		time.Sleep(time.Millisecond)
+	}
 
-	return totalChan
+	defer wg.Done()
 }
 
 func outputData(workerIdx int, outputChan chan string, config *DataConfig, fileOut *os.File, wg *sync.WaitGroup) {
@@ -64,24 +97,38 @@ func outputData(workerIdx int, outputChan chan string, config *DataConfig, fileO
 	}
 }
 
-func GenerateCsv(config *DataConfig) error {
+func workersResumeTotal(workStats []float64) float64 {
+	total := float64(0)
+
+	for i := 0; i < len(workStats); i++ {
+		total += workStats[i]
+	}
+
+	return total / float64(len(workStats))
+}
+
+func GenerateCsv(config *DataConfig, concurrent int) error {
 	var wgRecords, wgOutput sync.WaitGroup
 	outputChan := make(chan string)
+	workStatChan := make(chan WorkerStatus)
+	ncpu := concurrent
 
-	ncpu := runtime.NumCPU()
+	if concurrent == 0 {
+		ncpu = runtime.NumCPU()
+	}
+
 	runtime.GOMAXPROCS(ncpu)
 
 	recordsPerCore := config.Length / int32(ncpu)
 
 	files := make([]*os.File, ncpu)
-	totalPWorkers := make([]chan float64, ncpu)
 	for i := 0; i < ncpu; i++ {
 		if i == (ncpu - 1) {
 			recordsPerCore += int32(math.Remainder(float64(config.Length), float64(ncpu)))
 		}
 
 		fmt.Println("Scheduling create of ", recordsPerCore)
-		totalPWorkers[i] = pushRecords(i, recordsPerCore, config, outputChan, &wgRecords)
+		go pushRecords(i, recordsPerCore, config, outputChan, workStatChan, &wgRecords)
 
 		file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(i) + ".csv")
 		files[i] = file
@@ -90,19 +137,17 @@ func GenerateCsv(config *DataConfig) error {
 		go outputData(i, outputChan, config, files[i], &wgOutput)
 	}
 
-	var wt1, wt2, wt3, wt4 float64
+	workStats := make([]float64, ncpu)
 
-	for !(wt1 == 100 && wt2 == 100 && wt3 == 100 && wt4 == 100) {
-		fmt.Printf("Workers status: %.02f%%, %.02f%%, %.02f%%, %.02f%%                               \r", wt1, wt2, wt3, wt4)
+	for !isWorkersComplete(workStats) {
+		fmt.Printf("Workers status: %.2f%%                      \r", workersResumeTotal(workStats))
 		select {
-		case wt1 = <-totalPWorkers[0]:
-		case wt2 = <-totalPWorkers[1]:
-		case wt3 = <-totalPWorkers[2]:
-		case wt4 = <-totalPWorkers[3]:
+		case status := <-workStatChan:
+			workStats[status.Id] = status.Total
 		}
 	}
 
-	fmt.Printf("Workers status: %.02f%%, %.02f%%, %.02f%%, %.02f%%                               \r", wt1, wt2, wt3, wt4)
+	fmt.Printf("Workers status: %.2f%%                      \n", workersResumeTotal(workStats))
 
 	close(outputChan)
 	wgOutput.Wait()
@@ -119,7 +164,7 @@ func GenerateCsv(config *DataConfig) error {
 	return nil
 }
 
-func Generator(configFile string, outputFile string, format string, length int32) error {
+func Generator(configFile string, outputFile string, format string, length int32, concurrent int) error {
 	var dataConfig DataConfig
 
 	if length == 0 {
@@ -146,10 +191,16 @@ func Generator(configFile string, outputFile string, format string, length int32
 	for idx, field := range fields {
 		for name, config := range field.(map[interface{}]interface{}) {
 			cfg := config.(map[interface{}]interface{})
+			chars, ok := cfg["chars"].(string)
+
+			if !ok {
+				chars = ""
+			}
+
 			rConfig := RecordConfig{
 				Name:  name.(string),
 				Type:  cfg["type"].(string),
-				Chars: cfg["chars"].(string),
+				Chars: chars,
 				Min:   cfg["min"].(int),
 				Max:   cfg["max"].(int),
 			}
@@ -164,7 +215,7 @@ func Generator(configFile string, outputFile string, format string, length int32
 
 	switch format {
 	case "csv":
-		err = GenerateCsv(&dataConfig)
+		err = GenerateCsv(&dataConfig, concurrent)
 	default:
 		fmt.Println("Unknown format: " + format)
 	}

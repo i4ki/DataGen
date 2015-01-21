@@ -10,4 +10,13 @@ fields:
       type: "string"
       min: 3
       max: 256
-      chars: "A-Za-z "
+      chars: " A-Za-z"
+  - nm_fantasia:
+      type: "string"
+      min: 3
+      max: 256
+      chars: " A-Za-z"
+  - number_employees:
+      type: "integer"
+      min: 0
+      max: 100000

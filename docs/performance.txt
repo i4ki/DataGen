@@ -1,0 +1,163 @@
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 1
+Scheduling create of  100000
+Workers status: 100.00%                      
+
+real	1m50.309s
+user	0m6.966s
+sys	0m8.982s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 2
+Scheduling create of  50000
+Scheduling create of  50000
+Workers status: 100.00%                      
+
+real	0m55.917s
+user	0m6.254s
+sys	0m7.491s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 3
+Scheduling create of  33333
+Scheduling create of  33333
+Scheduling create of  33334
+Workers status: 100.00%                      
+
+real	0m37.164s
+user	0m5.794s
+sys	0m6.656s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 4
+Scheduling create of  25000
+Scheduling create of  25000
+Scheduling create of  25000
+Scheduling create of  25000
+Workers status: 100.00%                      
+
+real	0m28.505s
+user	0m4.747s
+sys	0m5.404s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 5
+Scheduling create of  20000
+Scheduling create of  20000
+Scheduling create of  20000
+Scheduling create of  20000
+Scheduling create of  20000
+Workers status: 100.00%                      
+
+real	0m23.209s
+user	0m5.737s
+sys	0m7.084s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 6
+Scheduling create of  16666
+Scheduling create of  16666
+Scheduling create of  16666
+Scheduling create of  16666
+Scheduling create of  16666
+Scheduling create of  16664
+Workers status: 100.00%                      
+
+real	0m19.300s
+user	0m7.674s
+sys	0m8.943s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ mkdir docs/graph -p
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 7
+Scheduling create of  14285
+Scheduling create of  14285
+Scheduling create of  14285
+Scheduling create of  14285
+Scheduling create of  14285
+Scheduling create of  14285
+Scheduling create of  14283
+Workers status: 100.00%                      
+
+real	0m16.798s
+user	0m6.867s
+sys	0m7.976s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 8
+Scheduling create of  12500
+Scheduling create of  12500
+Scheduling create of  12500
+Scheduling create of  12500
+Scheduling create of  12500
+Scheduling create of  12500
+Scheduling create of  12500
+Scheduling create of  12500
+Workers status: 100.00%                      
+
+real	0m14.687s
+user	0m6.482s
+sys	0m7.606s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 9
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11111
+Scheduling create of  11112
+Workers status: 100.00%                      
+
+real	0m13.023s
+user	0m6.882s
+sys	0m7.029s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 10
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Scheduling create of  10000
+Workers status: 100.00%                      
+
+real	0m11.796s
+user	0m6.259s
+sys	0m6.603s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 15
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6666
+Scheduling create of  6661
+Workers status: 100.00%                      
+
+real	0m10.473s
+user	0m5.158s
+sys	0m5.105s
+secplus@ganges:~/projects/go-workspace/src/github.com/tiago4orion/DataGen$ time ./DataGen -c company.yaml -o test_ -f csv -n 100000 -t 20
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Scheduling create of  5000
+Workers status: 100.00%                      
+
+real	0m10.595s
+user	0m4.467s
+sys	0m4.152s

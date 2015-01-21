@@ -14,12 +14,14 @@ func main() {
 	var dataConfigPath, outputFile, format string
 	var helpOpt, missingOpts bool
 	var nrecords int32
+	var concurrent int
 
 	optarg.Add("h", "help", "Displays this help", false)
 	optarg.Add("c", "data-config", "Data configuration file", "")
 	optarg.Add("o", "output-file", "Output file", "")
 	optarg.Add("f", "format", "Output format", "")
 	optarg.Add("n", "number-records", "Number of records", "")
+	optarg.Add("t", "concurrent", "Number of concurrent routines", "")
 
 	for opt := range optarg.Parse() {
 		switch opt.ShortName {
@@ -36,6 +38,8 @@ func main() {
 			} else {
 				nrecords = int32(ntmp)
 			}
+		case "t":
+			concurrent = opt.Int()
 		case "h":
 			helpOpt = opt.Bool()
 
@@ -66,6 +70,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := data.Generator(dataConfigPath, outputFile, format, nrecords)
+	err := data.Generator(dataConfigPath, outputFile, format, nrecords, concurrent)
 	utils.Check(err)
 }
