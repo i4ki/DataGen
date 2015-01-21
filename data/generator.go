@@ -127,7 +127,10 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 			recordsPerCore += int32(math.Remainder(float64(config.Length), float64(ncpu)))
 		}
 
-		fmt.Println("Scheduling create of ", recordsPerCore)
+		if recordsPerCore <= 0 {
+			continue
+		}
+
 		go pushRecords(i, recordsPerCore, config, outputChan, workStatChan, &wgRecords)
 
 		file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(i) + ".csv")
