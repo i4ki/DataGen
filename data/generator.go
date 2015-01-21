@@ -1,13 +1,14 @@
 package data
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,15 @@ type WorkerStatus struct {
 	Total float64
 }
 
+type ProcessWorker struct {
+	Id           int
+	NRecords     int32
+	Config       *DataConfig
+	OutputChan   chan []string
+	WorkStatChan chan WorkerStatus
+	wait         *sync.WaitGroup
+}
+
 func isWorkersComplete(workStats []float64) bool {
 	var complete bool = true
 
@@ -44,7 +54,7 @@ func isWorkersComplete(workStats []float64) bool {
 	return complete
 }
 
-func CSVLineCreate(record []RecordConfig) string {
+func CSVLineCreate(record []RecordConfig, r *rand.Rand) []string {
 	fields := make([]string, len(record))
 	var err error
 
@@ -52,12 +62,12 @@ func CSVLineCreate(record []RecordConfig) string {
 		switch recordField.Type {
 		case "string":
 			fields[idx], err = utilsg.GeneratorString(recordField.Chars,
-				recordField.Min, recordField.Max)
+				recordField.Min, recordField.Max, r)
 			if err != nil {
 				panic(err)
 			}
 		case "integer":
-			tmpInt, err := utilsg.GeneratorInteger(recordField.Min, recordField.Max)
+			tmpInt, err := utilsg.GeneratorInteger(recordField.Min, recordField.Max, r)
 			if err != nil {
 				panic(err)
 			}
@@ -66,35 +76,39 @@ func CSVLineCreate(record []RecordConfig) string {
 		}
 	}
 
-	return strings.Join(fields, ",") + "\n"
+	return fields
 }
 
-func pushRecords(workerIdx int, nrecords int32, config *DataConfig, outputChan chan string, workStatChan chan WorkerStatus, wg *sync.WaitGroup) {
-	wg.Add(1)
-	for i := int32(0); i < nrecords; i++ {
-		outLine := CSVLineCreate(config.Records)
-		outputChan <- outLine
-		workStatChan <- WorkerStatus{
-			Id:    workerIdx,
-			Total: 100.0 * float64(i+1) / float64(nrecords),
+func processRecords(worker ProcessWorker) {
+	worker.wait.Add(1)
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := int32(0); i < worker.NRecords; i++ {
+		outLine := CSVLineCreate(worker.Config.Records, r)
+		worker.OutputChan <- outLine
+		worker.WorkStatChan <- WorkerStatus{
+			Id:    worker.Id,
+			Total: 100.0 * float64(i+1) / float64(worker.NRecords),
 		}
 
 		time.Sleep(time.Millisecond)
 	}
 
-	defer wg.Done()
+	defer worker.wait.Done()
 }
 
-func outputData(workerIdx int, outputChan chan string, config *DataConfig, fileOut *os.File, wg *sync.WaitGroup) {
+func outputData(workerIdx int, outputChan chan []string, config *DataConfig, csvWriter *csv.Writer, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for outStr := range outputChan {
-		if _, err := fileOut.Write([]byte(outStr)); err != nil {
+	for line := range outputChan {
+		if err := csvWriter.Write(line); err != nil {
 			panic(err)
 		}
 
 		time.Sleep(time.Millisecond)
 	}
+
+	csvWriter.Flush()
 }
 
 func workersResumeTotal(workStats []float64) float64 {
@@ -109,7 +123,7 @@ func workersResumeTotal(workStats []float64) float64 {
 
 func GenerateCsv(config *DataConfig, concurrent int) error {
 	var wgRecords, wgOutput sync.WaitGroup
-	outputChan := make(chan string)
+	outputChan := make(chan []string)
 	workStatChan := make(chan WorkerStatus)
 	ncpu := concurrent
 
@@ -131,13 +145,15 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 			continue
 		}
 
-		go pushRecords(i, recordsPerCore, config, outputChan, workStatChan, &wgRecords)
+		go processRecords(ProcessWorker{i, recordsPerCore, config, outputChan, workStatChan, &wgRecords})
 
 		file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(i) + ".csv")
-		files[i] = file
 		utils.Check(err)
+
+		csvWriter := csv.NewWriter(file)
+		files[i] = file
 		wgOutput.Add(1)
-		go outputData(i, outputChan, config, files[i], &wgOutput)
+		go outputData(i, outputChan, config, csvWriter, &wgOutput)
 	}
 
 	workStats := make([]float64, ncpu)

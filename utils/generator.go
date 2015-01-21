@@ -4,14 +4,13 @@ import (
 	"errors"
 	"math/rand"
 )
-import "time"
 
-func GeneratorInteger(min int, max int) (int, error) {
+func GeneratorInteger(min int, max int, r *rand.Rand) (int, error) {
 	if min > max {
 		return -1, errors.New("GeneratorInteger requires that min should be bigger than max...")
 	}
 
-	ret := rand.Intn(max)
+	ret := r.Intn(max)
 
 	if ret < min {
 		ret = min
@@ -20,7 +19,7 @@ func GeneratorInteger(min int, max int) (int, error) {
 	return ret, nil
 }
 
-func GeneratorString(rangeStr string, min int, max int) (string, error) {
+func GeneratorString(rangeStr string, min int, max int, r *rand.Rand) (string, error) {
 	erange, err := ExpandRanges(rangeStr)
 
 	if err != nil {
@@ -28,21 +27,20 @@ func GeneratorString(rangeStr string, min int, max int) (string, error) {
 	}
 
 	ret := ""
-	rand.Seed(time.Now().UTC().UnixNano())
 	if max == 0 {
-		max = rand.Intn(256)
+		max = r.Intn(256)
 	}
 
-	nChars := rand.Intn(max)
+	nChars := r.Intn(max)
 	if nChars <= min {
 		nChars = min
 	}
 
 	for i := 0; i < nChars; i++ {
 		var c int
-		n := rand.Intn(len(erange))
+		n := r.Intn(len(erange))
 		if n > 0 {
-			c = rand.Intn(n)
+			c = r.Intn(n)
 		} else {
 			c = n
 		}
