@@ -79,7 +79,7 @@ func CSVLineCreate(record []RecordConfig, r *rand.Rand) []string {
 	return fields
 }
 
-func processRecords(worker ProcessWorker) {
+func processRecords(worker *ProcessWorker) {
 	worker.wait.Add(1)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -145,7 +145,7 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 			continue
 		}
 
-		go processRecords(ProcessWorker{i, recordsPerCore, config, outputChan, workStatChan, &wgRecords})
+		go processRecords(&ProcessWorker{i, recordsPerCore, config, outputChan, workStatChan, &wgRecords})
 
 		file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(i) + ".csv")
 		utils.Check(err)
