@@ -84,3 +84,28 @@ func TestGeneratorInteger(t *testing.T) {
 		t.Error("Failed to generate integer: ", ret, err)
 	}
 }
+
+func BenchmarkGeneratorString(b *testing.B) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := GeneratorString("abc", 3, 256, r)
+		if err != nil {
+			b.Error(err)
+			panic(err)
+		}
+	}
+}
+
+func BenchmarkGeneratorStringParallel(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			_, err := GeneratorString("abc", 3, 256, r)
+			if err != nil {
+				b.Error(err)
+				panic(err)
+			}
+		}
+	})
+}
