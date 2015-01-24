@@ -6,10 +6,9 @@ go:
 install: go get -d -v ./... && go build -v ./...
 script:
   - go get golang.org/x/tools/cmd/vet
-  - go get golang.org/x/tools/cmd/cover
+  - if [[ "x`go version | grep 1.4`" != "x" ]]; then go get golang.org/x/tools/cmd/cover; else go get code.google.com/p/go.tools/cmd/cover; fi
   - go get github.com/mattn/goveralls 
   - go test -v -bench . -cpu 1,2,4,8 ./... 
-  - go vet -v ./...
   - docs/project-code-coverage.sh
 
 notifications:
