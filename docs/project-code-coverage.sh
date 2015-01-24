@@ -1,5 +1,7 @@
 #!/bin/bash
 
+COVERALLS="lAKAWPzcGsD3A8yBX3BGGtRUdJ6CaGERL"
+
 echo "mode: count" > acc.out
 for Dir in . $(find ./* -maxdepth 10 -type d ); 
 do
