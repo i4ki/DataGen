@@ -1,22 +1,18 @@
 format: csv
 filename: company.csv
 fields:
-  - cd_cnpj:
+  - id:
       type: "string"
       min: 14
       max: 14
       chars: "0-9"
-  - nm_razao_social:
+  - company_name:
       type: "string"
       min: 3
       max: 256
       chars: " A-Za-z"
-  - nm_fantasia:
+  - address:
       type: "string"
       min: 3
       max: 256
       chars: " A-Za-z"
-  - number_employees:
-      type: "integer"
-      min: 0
-      max: 100000
