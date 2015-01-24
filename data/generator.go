@@ -97,8 +97,13 @@ func processRecords(worker *ProcessWorker) {
 	defer worker.wait.Done()
 }
 
-func outputData(workerIdx int, outputChan chan []string, config *DataConfig, csvWriter *csv.Writer, wg *sync.WaitGroup) {
+func outputData(workerIdx int, outputChan chan []string, config *DataConfig, wg *sync.WaitGroup) {
+	wg.Add(1)
 	defer wg.Done()
+	file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(workerIdx) + ".csv")
+	utils.Check(err)
+
+	csvWriter := csv.NewWriter(file)
 
 	for line := range outputChan {
 		if err := csvWriter.Write(line); err != nil {
@@ -109,6 +114,12 @@ func outputData(workerIdx int, outputChan chan []string, config *DataConfig, csv
 	}
 
 	csvWriter.Flush()
+
+	defer func() {
+		if err := file.Close(); err != nil {
+			panic(err)
+		}
+	}()
 }
 
 func workersResumeTotal(workStats []float64) float64 {
@@ -131,29 +142,30 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 		ncpu = runtime.NumCPU()
 	}
 
+	if config.Length < int32(ncpu) {
+		ncpu = int(config.Length)
+	}
+
 	runtime.GOMAXPROCS(ncpu)
 
 	recordsPerCore := config.Length / int32(ncpu)
 
-	files := make([]*os.File, ncpu)
 	for i := 0; i < ncpu; i++ {
+		workerRecords := recordsPerCore
 		if i == (ncpu - 1) {
-			recordsPerCore += int32(math.Remainder(float64(config.Length), float64(ncpu)))
+			if float64(config.Length) > float64(ncpu) {
+				workerRecords += int32(math.Remainder(float64(config.Length), float64(ncpu)))
+			} else {
+				workerRecords = int32(config.Length)
+			}
 		}
 
-		if recordsPerCore <= 0 {
+		if workerRecords <= 0 {
 			continue
 		}
 
-		go processRecords(&ProcessWorker{i, recordsPerCore, config, outputChan, workStatChan, &wgRecords})
-
-		file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(i) + ".csv")
-		utils.Check(err)
-
-		csvWriter := csv.NewWriter(file)
-		files[i] = file
-		wgOutput.Add(1)
-		go outputData(i, outputChan, config, csvWriter, &wgOutput)
+		go processRecords(&ProcessWorker{i, workerRecords, config, outputChan, workStatChan, &wgRecords})
+		go outputData(i, outputChan, config, &wgOutput)
 	}
 
 	workStats := make([]float64, ncpu)
@@ -172,13 +184,6 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 	wgOutput.Wait()
 
 	// close fo on exit and check for its returned error
-	defer func() {
-		for _, fileOut := range files {
-			if err := fileOut.Close(); err != nil {
-				panic(err)
-			}
-		}
-	}()
 
 	return nil
 }
@@ -196,11 +201,20 @@ func Generator(configFile string, outputFile string, format string, length int32
 	utils.Check(err)
 
 	if format == "" {
-		if cfgYaml["format"].(string) != "" {
-			format = cfgYaml["format"].(string)
+		tmp, ok := cfgYaml["format"].(string)
+		if ok {
+			format = tmp
 			fmt.Printf("Output format: %s\n", format)
 		} else {
 			return errors.New("No output format chosen...")
+		}
+	}
+
+	if outputFile == "" {
+		tmp, ok := cfgYaml["filename"].(string)
+		if ok {
+			outputFile = tmp
+			fmt.Printf("Output file: %s\n", outputFile)
 		}
 	}
 
