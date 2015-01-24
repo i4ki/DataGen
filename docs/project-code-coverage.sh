@@ -21,6 +21,7 @@ done
 
 cat acc.out | go run docs/merge-coverprofile.go > merged.out
 
+echo "REPO TOKEN: $COVERALLS"
 if [ -n "$COVERALLS" ]
 then
     echo "goveralls......"
