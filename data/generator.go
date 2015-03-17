@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	"github.com/NeowayLabs/clinit-cfn-tool/utils"
 	utilsg "github.com/tiago4orion/DataGen/utils"
 )
@@ -28,6 +29,7 @@ type DataConfig struct {
 	Records    []RecordConfig
 	Length     int32
 	OutputFile string
+	Format     string
 }
 
 type WorkerStatus struct {
@@ -39,7 +41,7 @@ type ProcessWorker struct {
 	Id           int
 	NRecords     int32
 	Config       *DataConfig
-	OutputChan   chan []string
+	OutputChan   chan interface{}
 	WorkStatChan chan WorkerStatus
 	wait         *sync.WaitGroup
 }
@@ -79,12 +81,48 @@ func CSVLineCreate(record []RecordConfig, r *rand.Rand) []string {
 	return fields
 }
 
+func JSONCreate(record []RecordConfig, r *rand.Rand) map[string]interface{} {
+	var err error
+
+	fields := make(map[string]interface{})
+
+	for _, recordField := range record {
+		switch recordField.Type {
+		case "string":
+			fields[recordField.Name], err = utilsg.GeneratorString(recordField.Chars,
+				recordField.Min, recordField.Max, r)
+
+			if err != nil {
+				panic(err)
+			}
+		case "integer":
+			tmpInt, err := utilsg.GeneratorInteger(recordField.Min, recordField.Max, r)
+			if err != nil {
+				panic(err)
+			}
+
+			fields[recordField.Name] = strconv.Itoa(tmpInt)
+		}
+	}
+
+	return fields
+}
+
 func processRecords(worker *ProcessWorker) {
+	var outLine interface{}
+
 	worker.wait.Add(1)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := int32(0); i < worker.NRecords; i++ {
-		outLine := CSVLineCreate(worker.Config.Records, r)
+		if worker.Config.Format == "csv" {
+			outLine = CSVLineCreate(worker.Config.Records, r)
+		} else if worker.Config.Format == "json" {
+			outLine = JSONCreate(worker.Config.Records, r)
+		} else {
+			panic(errors.New("Invalid format..."))
+		}
+
 		worker.OutputChan <- outLine
 		worker.WorkStatChan <- WorkerStatus{
 			Id:    worker.Id,
@@ -97,7 +135,7 @@ func processRecords(worker *ProcessWorker) {
 	defer worker.wait.Done()
 }
 
-func outputData(workerIdx int, outputChan chan []string, config *DataConfig, wg *sync.WaitGroup) {
+func outputDataCSV(workerIdx int, outputChan chan interface{}, config *DataConfig, wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 	file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(workerIdx) + ".csv")
@@ -106,7 +144,8 @@ func outputData(workerIdx int, outputChan chan []string, config *DataConfig, wg 
 	csvWriter := csv.NewWriter(file)
 
 	for line := range outputChan {
-		if err := csvWriter.Write(line); err != nil {
+		l := line.([]string)
+		if err := csvWriter.Write(l); err != nil {
 			panic(err)
 		}
 
@@ -116,6 +155,45 @@ func outputData(workerIdx int, outputChan chan []string, config *DataConfig, wg 
 	csvWriter.Flush()
 
 	defer func() {
+		if err := file.Close(); err != nil {
+			panic(err)
+		}
+	}()
+}
+
+func outputDataJSON(workerIdx int, outputChan chan interface{}, config *DataConfig, wg *sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
+	file, err := os.Create(config.OutputFile + "_" + strconv.Itoa(workerIdx) + ".json")
+	utils.Check(err)
+
+	file.Write([]byte("["))
+
+	firstIteration := true
+
+	for doc := range outputChan {
+		if !firstIteration {
+			file.Write([]byte(","))
+		} else {
+			firstIteration = false
+		}
+
+		d := doc.(map[string]interface{})
+
+		dstr, err := json.Marshal(&d)
+
+		if err != nil {
+			panic(err)
+		}
+
+		file.Write(dstr)
+		time.Sleep(time.Millisecond)
+	}
+
+	file.Write([]byte("]"))
+
+	defer func() {
+		file.Sync()
 		if err := file.Close(); err != nil {
 			panic(err)
 		}
@@ -132,9 +210,9 @@ func workersResumeTotal(workStats []float64) float64 {
 	return total / float64(len(workStats))
 }
 
-func GenerateCsv(config *DataConfig, concurrent int) error {
+func GenerateData(config *DataConfig, concurrent int, format string) error {
 	var wgRecords, wgOutput sync.WaitGroup
-	outputChan := make(chan []string)
+	outputChan := make(chan interface{})
 	workStatChan := make(chan WorkerStatus)
 	ncpu := concurrent
 
@@ -165,7 +243,12 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 		}
 
 		go processRecords(&ProcessWorker{i, workerRecords, config, outputChan, workStatChan, &wgRecords})
-		go outputData(i, outputChan, config, &wgOutput)
+
+		if format == "csv" {
+			go outputDataCSV(i, outputChan, config, &wgOutput)
+		} else if format == "json" {
+			go outputDataJSON(i, outputChan, config, &wgOutput)
+		}
 	}
 
 	workStats := make([]float64, ncpu)
@@ -182,8 +265,6 @@ func GenerateCsv(config *DataConfig, concurrent int) error {
 
 	close(outputChan)
 	wgOutput.Wait()
-
-	// close fo on exit and check for its returned error
 
 	return nil
 }
@@ -245,13 +326,8 @@ func Generator(configFile string, outputFile string, format string, length int32
 	dataConfig.Records = recordConfig
 	dataConfig.Length = length
 	dataConfig.OutputFile = outputFile
+	dataConfig.Format = format
 
-	switch format {
-	case "csv":
-		err = GenerateCsv(&dataConfig, concurrent)
-	default:
-		fmt.Println("Unknown format: " + format)
-	}
-
+	err = GenerateData(&dataConfig, concurrent, format)
 	return err
 }
